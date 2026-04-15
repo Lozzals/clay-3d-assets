@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clay Nation — 3D Asset Library</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f8f7f4;--surface:#ffffff;--border:rgba(0,0,0,0.09);
+  --text:#1a1a1a;--muted:#6b6b6b;--accent:#2E75B6;
+  --accent-light:#e6f1fb;--radius:12px;--tag-bg:#eef0f3;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+header{background:var(--surface);border-bottom:0.5px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:100;flex-wrap:wrap}
+.logo{font-size:15px;font-weight:600;color:var(--text);white-space:nowrap;flex-shrink:0}
+.logo span{color:var(--accent)}
+.search-wrap{flex:1;min-width:160px;max-width:360px}
+.search-wrap input{width:100%;padding:7px 14px;border:0.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);outline:none}
+.search-wrap input:focus{border-color:var(--accent)}
+.filters{display:flex;gap:6px;flex-wrap:wrap;flex:1}
+.fb{padding:5px 12px;border:0.5px solid var(--border);border-radius:20px;font-size:11px;cursor:pointer;background:var(--surface);color:var(--muted);transition:all 0.12s;white-space:nowrap;flex-shrink:0}
+.fb:hover{background:var(--accent-light);color:var(--accent);border-color:var(--accent)}
+.fb.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.count{font-size:12px;color:var(--muted);white-space:nowrap;flex-shrink:0}
+.stats-bar{display:flex;gap:24px;padding:12px 24px;background:var(--surface);border-bottom:0.5px solid var(--border);flex-wrap:wrap}
+.stat{display:flex;flex-direction:column;gap:1px}
+.stat-n{font-size:20px;font-weight:600;color:var(--accent)}
+.stat-l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px}
+main{padding:20px 24px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:border-color 0.15s,transform 0.15s;display:flex;flex-direction:column}
+.card:hover{border-color:var(--accent);transform:translateY(-1px)}
+.preview{width:100%;aspect-ratio:1;background:#f0eeea;position:relative;display:flex;align-items:center;justify-content:center;cursor:grab;min-height:160px}
+.preview:active{cursor:grabbing}
+.preview canvas{width:100%!important;height:100%!important;display:block}
+.placeholder{width:100%;aspect-ratio:1;background:#f4f2ee;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
+.cat-icon{font-size:42px;line-height:1;opacity:0.55}
+.ph-type{font-size:10px;color:var(--muted);font-weight:600;letter-spacing:0.8px;text-transform:uppercase;background:var(--tag-bg);padding:3px 8px;border-radius:4px}
+.card-body{padding:11px 13px;flex:1;display:flex;flex-direction:column;gap:4px}
+.card-name{font-size:12px;font-weight:500;color:var(--text);line-height:1.35}
+.card-meta{font-size:11px;color:var(--muted)}
+.tags{display:flex;gap:3px;flex-wrap:wrap;margin-top:4px}
+.tag{padding:2px 6px;border-radius:4px;font-size:9px;font-weight:500}
+.tag.glb{background:#e1f5ee;color:#0f6e56}
+.tag.fbx{background:#eeedfe;color:#534AB7}
+.tag.rar,.tag.zip{background:#faeeda;color:#854F0B}
+.tag.folder{background:#e6f1fb;color:#185FA5}
+.hint{font-size:9px;color:var(--muted);text-align:center;padding:3px 0;opacity:0.6}
+.ld{position:absolute;inset:0;background:#f0eeea;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;font-size:11px;color:var(--muted)}
+.sp{width:18px;height:18px;border:2px solid rgba(0,0,0,0.1);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{grid-column:1/-1;text-align:center;padding:60px 0;color:var(--muted);font-size:14px}
+.sec{grid-column:1/-1;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:0.9px;text-transform:uppercase;padding:6px 0 2px;border-bottom:0.5px solid var(--border);margin-bottom:2px}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Clay Nation <span>Asset Library</span></div>
+  <div class="search-wrap"><input type="text" id="s" placeholder="Search by name, category or creator..." autocomplete="off"></div>
+  <div class="filters" id="f"></div>
+  <div class="count" id="cnt"></div>
+</header>
+<div class="stats-bar" id="sb"></div>
+<main><div class="grid" id="grid"></div></main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const A=[
+  /* BUILDING KIT — live 3D previews (GLB files in /glbs/) */
+  {n:"Wood Door",f:"SM_Stylized_Wood_Door.glb",t:"glb",c:"Building",by:""},
+  {n:"Wood Doorframe",f:"SM_Stylized_Wood_Doorframe.glb",t:"glb",c:"Building",by:""},
+  {n:"Wood Window",f:"SM_Stylized_Wood_Window.glb",t:"glb",c:"Building",by:""},
+  {n:"Wood Windowframe",f:"SM_Stylized_Wood_Windowframe.glb",t:"glb",c:"Building",by:""},
+  {n:"Wood Wall",f:"SM_Stylized_Wood_Wall.glb",t:"glb",c:"Building",by:""},
+  {n:"Wood Foundation",f:"SM_Stylized_Wood_Foundation.glb",t:"glb",c:"Building",by:""},
+  {n:"Wood Fence",f:"SM_Stylized_Wood_Fence.glb",t:"glb",c:"Building",by:""},
+  {n:"Wood Roof",f:"SM_Stylized_Wood_Roof.glb",t:"glb",c:"Building",by:""},
+  {n:"Wood Half Roof",f:"SM_Stylized_Wood_Half_Roof.glb",t:"glb",c:"Building",by:""},
+  {n:"Wood Stairs",f:"SM_Stylized_Wood_Stairs.glb",t:"glb",c:"Building",by:""},
+  {n:"Wood Ramp",f:"SM_Stylized_Wood_Ramp.glb",t:"glb",c:"Building",by:""},
+  {n:"Wood Triangle Wall",f:"SM_Stylized_Wood_Triangle_Wall.glb",t:"glb",c:"Building",by:""},
+  {n:"Wood Triangle Ceiling",f:"SM_Stylized_Wood_Triangle_Ceiling.glb",t:"glb",c:"Building",by:""},
+  {n:"Wood Triangle Foundation",f:"SM_Stylized_Wood_Triangle_Foundation.glb",t:"glb",c:"Building",by:""},
+  {n:"Wood Sloped Right",f:"SM_Stylized_Wood_Sloped_Wall_Right.glb",t:"glb",c:"Building",by:""},
+  {n:"Wood Sloped Left",f:"SM_Stylized_Wood_Sloped_Wall_Left.glb",t:"glb",c:"Building",by:""},
+  {n:"Stone Doorframe",f:"SM_Stylized_Stone_Doorframe.glb",t:"glb",c:"Building",by:""},
+  {n:"Stone Wall",f:"SM_Stylized_Stone_Wall.glb",t:"glb",c:"Building",by:""},
+  {n:"Stone Foundation",f:"SM_Stylized_Stone_Foundation.glb",t:"glb",c:"Building",by:""},
+  {n:"Stone Windowframe",f:"SM_Stylized_Stone_Windowframe.glb",t:"glb",c:"Building",by:""},
+  {n:"Floating Island",f:"SM_FloatingIsland.glb",t:"glb",c:"Landscape",by:""},
+  {n:"Cliff 03",f:"SM_cliff_03.glb",t:"glb",c:"Landscape",by:""},
+  {n:"Rock Medium",f:"SM_RockMedium_01.glb",t:"glb",c:"Rocks",by:""},
+  /* SEATING */
+  {n:"Sofa 1 White Leather",t:"folder",c:"Seating",by:""},
+  {n:"Sofa 2 Modular",t:"folder",c:"Seating",by:""},
+  {n:"Sofa 3 Buttoned",t:"folder",c:"Seating",by:""},
+  {n:"Chair 1 Egg Chair",t:"folder",c:"Seating",by:""},
+  {n:"Chair 2 Pouffe",t:"folder",c:"Seating",by:""},
+  {n:"Chair 3 Stone Stool",t:"folder",c:"Seating",by:""},
+  {n:"Chair 4 Stone Lounger",t:"folder",c:"Seating",by:""},
+  {n:"Chair 5 Vintage Armchair",t:"folder",c:"Seating",by:""},
+  {n:"Chair 7 Tattoo Bed",t:"folder",c:"Seating",by:""},
+  {n:"Chair 9 Garden",t:"folder",c:"Seating",by:""},
+  {n:"Chair 10 Garden",t:"folder",c:"Seating",by:""},
+  {n:"Chair 11 Garden Lounger",t:"folder",c:"Seating",by:""},
+  {n:"Chair 14 BeanBag",t:"folder",c:"Seating",by:""},
+  {n:"Cushion 1",t:"folder",c:"Seating",by:""},
+  {n:"Cushion 2",t:"folder",c:"Seating",by:""},
+  {n:"Chair Collection Anim",t:"folder",c:"Seating",by:""},
+  /* TABLES */
+  {n:"Table 1 Stone Conference",t:"folder",c:"Tables",by:""},
+  {n:"Table 2 Marble Trees",t:"folder",c:"Tables",by:""},
+  {n:"Table 3 Chess",t:"folder",c:"Tables",by:""},
+  {n:"Table 4 Garden",t:"folder",c:"Tables",by:""},
+  {n:"Table 5 Diner Glass",t:"folder",c:"Tables",by:""},
+  {n:"Coffee Table 2 Marble",t:"folder",c:"Tables",by:""},
+  {n:"Coffee Table 3 Marble",t:"folder",c:"Tables",by:""},
+  {n:"Desk 1 Marble",t:"folder",c:"Tables",by:""},
+  /* RUGS */
+  {n:"Rug 1 Fragments",t:"folder",c:"Rugs",by:""},
+  {n:"Rug 2 Flowers",t:"folder",c:"Rugs",by:""},
+  {n:"Rug 3 Stars",t:"folder",c:"Rugs",by:""},
+  {n:"Rug 4 Diamond",t:"folder",c:"Rugs",by:""},
+  {n:"Rug 5 Geometric",t:"folder",c:"Rugs",by:""},
+  {n:"Rug 6 Geometric",t:"folder",c:"Rugs",by:""},
+  {n:"Rug 7 Vintage",t:"folder",c:"Rugs",by:""},
+  {n:"Rug 8 Vintage",t:"folder",c:"Rugs",by:""},
+  {n:"Rug 9 Roses",t:"folder",c:"Rugs",by:""},
+  /* LIGHTS */
+  {n:"Floor Lamp 1 Cone",t:"folder",c:"Lights",by:""},
+  {n:"Floor Lamp 2 Arc",t:"folder",c:"Lights",by:""},
+  {n:"Floor Lamp 3 Sphere",t:"folder",c:"Lights",by:""},
+  {n:"Floor Lamp 4",t:"folder",c:"Lights",by:""},
+  {n:"Floor Lamp 5 Cone",t:"folder",c:"Lights",by:""},
+  {n:"Floor Lamp 6",t:"folder",c:"Lights",by:""},
+  {n:"Table Lamp 1 Double",t:"folder",c:"Lights",by:""},
+  {n:"Table Lamp 2 Candle",t:"folder",c:"Lights",by:""},
+  {n:"Table Lamp 3 Vintage",t:"folder",c:"Lights",by:""},
+  {n:"Streetlight 1 Helix",t:"folder",c:"Lights",by:""},
+  {n:"Streetlight 2 Eyeball",t:"folder",c:"Lights",by:""},
+  {n:"Streetlight 3 Eyeball String",t:"folder",c:"Lights",by:""},
+  {n:"Hanging 3",t:"folder",c:"Lights",by:""},
+  {n:"Hanging 4",t:"folder",c:"Lights",by:""},
+  {n:"Hanging 5",t:"folder",c:"Lights",by:""},
+  /* POTS */
+  {n:"Pots 1–9",t:"folder",c:"Pots",by:""},
+  {n:"Pot 10 Vintage Floral",t:"folder",c:"Pots",by:""},
+  {n:"Pot 11 Pattern",t:"folder",c:"Pots",by:""},
+  {n:"Pot 12 Hollow",t:"folder",c:"Pots",by:""},
+  {n:"Pot 13 Wave",t:"folder",c:"Pots",by:""},
+  {n:"Potted Plant 1 Snake",t:"folder",c:"Pots",by:""},
+  {n:"Potted Plant 2 Snake",t:"folder",c:"Pots",by:""},
+  {n:"Potted Plant 3 ZigZag",t:"folder",c:"Pots",by:""},
+  /* FOLIAGE */
+  {n:"Eyeball Plant",t:"folder",c:"Foliage",by:""},
+  {n:"Pink Cactus",t:"folder",c:"Foliage",by:""},
+  {n:"Wall Vine",t:"folder",c:"Foliage",by:""},
+  {n:"Wall Plants",t:"folder",c:"Foliage",by:""},
+  {n:"Vine 1 (3 variants)",t:"folder",c:"Foliage",by:""},
+  {n:"Vine 2 (5 variants)",t:"folder",c:"Foliage",by:""},
+  {n:"Modular Planters",t:"folder",c:"Foliage",by:""},
+  {n:"Tree Lamp",t:"folder",c:"Foliage",by:""},
+  {n:"Underworld Trees",t:"folder",c:"Foliage",by:""},
+  {n:"Tree Stump with Roots",t:"folder",c:"Foliage",by:""},
+  {n:"Facade Plants",t:"folder",c:"Foliage",by:""},
+  {n:"Roof Fill Back",t:"folder",c:"Foliage",by:""},
+  {n:"Roots",t:"folder",c:"Foliage",by:""},
+  /* CREATURES */
+  {n:"Fish 1",t:"folder",c:"Creatures",by:""},
+  {n:"Seahorse 1",t:"folder",c:"Creatures",by:""},
+  {n:"Anglerfish 1",t:"folder",c:"Creatures",by:""},
+  {n:"Parrot",t:"folder",c:"Creatures",by:""},
+  {n:"Cave Monster (7 anims)",t:"fbx",c:"Creatures",by:""},
+  {n:"Crocodile (bite + swim)",t:"fbx",c:"Creatures",by:""},
+  {n:"Eel",t:"rar",c:"Creatures",by:""},
+  {n:"Turtle (swim + landing)",t:"fbx",c:"Creatures",by:""},
+  {n:"Puffer Fish",t:"fbx",c:"Creatures",by:""},
+  {n:"Bird",t:"fbx",c:"Creatures",by:""},
+  {n:"Dog",t:"fbx",c:"Creatures",by:""},
+  {n:"Rock Creature (3 anims)",t:"fbx",c:"Creatures",by:""},
+  {n:"Amythest Creature",t:"fbx",c:"Creatures",by:""},
+  {n:"Monsters Pack",t:"rar",c:"Creatures",by:""},
+  /* STATUES */
+  {n:"Fountain 1 Pose",t:"folder",c:"Statues",by:""},
+  {n:"Fountain 2 Eyeball",t:"folder",c:"Statues",by:""},
+  {n:"Fountain 3 Fish",t:"folder",c:"Statues",by:""},
+  {n:"Fountain 4 Frogs",t:"folder",c:"Statues",by:""},
+  {n:"Statue 1 Wave",t:"folder",c:"Statues",by:""},
+  {n:"Statue 2 Wave",t:"folder",c:"Statues",by:""},
+  {n:"Statue 3 Stone Pyramid",t:"folder",c:"Statues",by:""},
+  {n:"Statue 4 Folded",t:"folder",c:"Statues",by:""},
+  {n:"Statue 5 Hoops",t:"folder",c:"Statues",by:""},
+  {n:"Statue 6 Head",t:"folder",c:"Statues",by:""},
+  {n:"Bust 1 Sad",t:"folder",c:"Statues",by:""},
+  /* SOUNDSYSTEMS */
+  {n:"DJ Booth Brick",t:"folder",c:"Soundsystems",by:""},
+  {n:"DJ Mixer Vinyl",t:"folder",c:"Soundsystems",by:""},
+  {n:"Speaker",t:"folder",c:"Soundsystems",by:""},
+  {n:"Dukebox",t:"folder",c:"Soundsystems",by:""},
+  /* TECHNOLOGY */
+  {n:"Vending Machine",t:"folder",c:"Technology",by:""},
+  {n:"Clay Pay",t:"folder",c:"Technology",by:""},
+  {n:"Podium Island",t:"folder",c:"Technology",by:""},
+  {n:"Podium Tall",t:"folder",c:"Technology",by:""},
+  {n:"Laptop",t:"folder",c:"Technology",by:""},
+  {n:"Circuit Board",t:"folder",c:"Technology",by:""},
+  {n:"Control Panel Blimp",t:"folder",c:"Technology",by:""},
+  {n:"Walkman",t:"folder",c:"Technology",by:""},
+  /* INSTRUMENTS */
+  {n:"Trombone",t:"folder",c:"Instruments",by:""},
+  {n:"Curvy Guitar",t:"folder",c:"Instruments",by:""},
+  {n:"Drum",t:"folder",c:"Instruments",by:""},
+  {n:"Flute",t:"folder",c:"Instruments",by:""},
+  {n:"Circle Keyboard",t:"folder",c:"Instruments",by:""},
+  {n:"Guitars Pack",t:"zip",c:"Instruments",by:""},
+  /* SIGNS */
+  {n:"Blade Signs 1–5",t:"folder",c:"Signs",by:""},
+  {n:"Blade Sign 11 Vintage",t:"folder",c:"Signs",by:""},
+  {n:"Rakudio Wall Sign",t:"folder",c:"Signs",by:""},
+  {n:"Rakudio Vinyl Sign",t:"folder",c:"Signs",by:""},
+  {n:"Arcade Ceiling",t:"folder",c:"Signs",by:""},
+  /* TRANSPORT */
+  {n:"Skateboard",t:"rar",c:"Transport",by:""},
+  /* ROCKS */
+  {n:"Rock 1 Carving",t:"folder",c:"Rocks",by:""},
+  {n:"Rocks Pack 1",t:"rar",c:"Rocks",by:""},
+  {n:"Rocks Pack 2",t:"rar",c:"Rocks",by:""},
+  /* LANDSCAPE */
+  {n:"Floating Platforms",t:"rar",c:"Landscape",by:""},
+  {n:"Platform 1",t:"rar",c:"Landscape",by:""},
+  {n:"Platform 2",t:"rar",c:"Landscape",by:""},
+  /* ANIMATIONS */
+  {n:"Stairwalk Anim",t:"fbx",c:"Animations",by:""},
+  {n:"Walking Anim",t:"fbx",c:"Animations",by:""},
+  {n:"Running Anim",t:"fbx",c:"Animations",by:""},
+  {n:"Cashier Idle",t:"fbx",c:"Animations",by:""},
+  {n:"Cashier Talking",t:"fbx",c:"Animations",by:""},
+  {n:"Teletransport Anim",t:"fbx",c:"Animations",by:""},
+  {n:"Trousers Stairwalk",t:"fbx",c:"Animations",by:""},
+  {n:"ChairCollection Anim",t:"zip",c:"Animations",by:""},
+  /* MISC */
+  {n:"Sword",t:"rar",c:"Misc",by:""},
+  {n:"Orb 1",t:"rar",c:"Misc",by:""},
+  {n:"Portal Collection",t:"zip",c:"Misc",by:""},
+  {n:"Marker",t:"rar",c:"Misc",by:""},
+  {n:"Campfire",t:"folder",c:"Misc",by:""},
+  {n:"Big Tent",t:"folder",c:"Misc",by:""},
+  {n:"Awning Striped",t:"folder",c:"Misc",by:""},
+  {n:"Awning Plain",t:"folder",c:"Misc",by:""},
+  {n:"Ornate Picture Frame",t:"folder",c:"Misc",by:""},
+  {n:"Canvas",t:"folder",c:"Misc",by:""},
+  {n:"Easel",t:"folder",c:"Misc",by:""},
+  {n:"Parasol Fluffy",t:"folder",c:"Misc",by:""},
+  {n:"Token",t:"folder",c:"Misc",by:""},
+  {n:"TreeHouse",t:"folder",c:"Misc",by:""},
+];
+
+const ICONS={Building:"🏗",Landscape:"🌍",Rocks:"🪨",Seating:"🪑",Tables:"🪵",Rugs:"🎨",Lights:"💡",Statues:"🗿",Foliage:"🌿",Pots:"🏺",Creatures:"🦎",Soundsystems:"🎵",Technology:"💻",Transport:"🛹",Instruments:"🎸",Signs:"🪧",Animations:"🎬",Misc:"📦"};
+const GLB_BASE="./glbs/";
+let cat="All",q="";
+
+/* stats */
+function buildStats(){
+  const s=document.getElementById("sb");
+  const glbs=A.filter(a=>a.t==="glb").length;
+  const cats=new Set(A.map(a=>a.c)).size;
+  
+  [{n:"300+",l:"assets"},{n:glbs,l:"live 3D previews"},{n:cats,l:"categories"}].forEach(({n,l})=>{
+    const d=document.createElement("div");d.className="stat";
+    d.innerHTML=`<span class="stat-n">${n}</span><span class="stat-l">${l}</span>`;
+    s.appendChild(d);
+  });
+}
+
+/* filters */
+function buildFilters(){
+  const cats=["All",...new Set(A.map(a=>a.c))];
+  const wrap=document.getElementById("f");
+  cats.forEach(c=>{
+    const b=document.createElement("button");b.className="fb"+(c==="All"?" on":"");
+    b.textContent=c==="All"?"All":`${ICONS[c]||""} ${c}`;
+    b.onclick=()=>{cat=c;document.querySelectorAll(".fb").forEach(x=>x.classList.remove("on"));b.classList.add("on");render();};
+    wrap.appendChild(b);
+  });
+}
+
+/* load helper */
+function loadSc(src,cb){const s=document.createElement("script");s.src=src;s.onload=cb;s.onerror=cb;document.head.appendChild(s);}
+
+/* GLB loader */
+function loadGLB(thumb,ld,asset){
+  const canvas=document.createElement("canvas");canvas.width=260;canvas.height=260;
+  let renderer;
+  try{renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));renderer.setSize(260,260);}
+  catch(e){ld.innerHTML='<span style="font-size:10px;color:#bbb">WebGL unavailable</span>';return;}
+  const scene=new THREE.Scene();
+  const cam=new THREE.PerspectiveCamera(45,1,0.001,1000);cam.position.set(2,1.5,3);cam.lookAt(0,0,0);
+  scene.add(new THREE.AmbientLight(0xffffff,0.85));
+  const dl=new THREE.DirectionalLight(0xffffff,0.65);dl.position.set(3,5,3);scene.add(dl);
+  const dl2=new THREE.DirectionalLight(0xffffff,0.25);dl2.position.set(-3,2,-3);scene.add(dl2);
+  let controls,model=null;
+  function anim(){requestAnimationFrame(anim);if(controls)controls.update();else if(model)model.rotation.y+=0.008;renderer.render(scene,cam);}
+  function initOC(){
+    if(THREE.OrbitControls){controls=new THREE.OrbitControls(cam,canvas);controls.enableDamping=true;controls.dampingFactor=0.08;controls.autoRotate=true;controls.autoRotateSpeed=1.8;}
+    anim();
+  }
+  function doLoad(){
+    const loader=new THREE.GLTFLoader();
+    loader.load(GLB_BASE+asset.f,gltf=>{
+      model=gltf.scene;
+      const box=new THREE.Box3().setFromObject(model);
+      const ctr=box.getCenter(new THREE.Vector3());
+      const sz=box.getSize(new THREE.Vector3());
+      const sc=2/Math.max(sz.x,sz.y,sz.z);
+      model.scale.setScalar(sc);model.position.sub(ctr.multiplyScalar(sc));
+      scene.add(model);if(controls)controls.target.set(0,0,0);
+      ld.remove();thumb.appendChild(canvas);
+      const hint=thumb.closest(".card").querySelector(".hint");if(hint)hint.style.display="block";
+    },null,()=>{ld.innerHTML='<span style="font-size:10px;color:#bbb;text-align:center;padding:10px">GLB preview<br><small>coming soon</small></span>';});
+  }
+  function step2(){if(!THREE.OrbitControls){loadSc("https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js",()=>{initOC();doLoad();});}else{initOC();doLoad();}}
+  if(!THREE.GLTFLoader){loadSc("https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js",step2);}else step2();
+}
+
+/* cards */
+function makeCard(a){
+  const card=document.createElement("div");card.className="card";
+  const meta=[a.by,a.c].filter(Boolean).join(" · ");
+  if(a.t==="glb"){
+    const thumb=document.createElement("div");thumb.className="preview";
+    const ld=document.createElement("div");ld.className="ld";ld.innerHTML='<div class="sp"></div><span>Loading 3D…</span>';
+    thumb.appendChild(ld);card.appendChild(thumb);
+    card.innerHTML+=`<div class="card-body"><div class="card-name">${a.n}</div><div class="tags"><span class="tag glb">GLB · 3D</span></div></div><div class="hint" style="display:none">drag to orbit · scroll to zoom</div>`;
+    card.insertBefore(thumb,card.firstChild);
+    setTimeout(()=>loadGLB(thumb,ld,a),150);
+  }else{
+    card.innerHTML=`<div class="placeholder"><div class="cat-icon">${ICONS[a.c]||"📦"}</div><div class="ph-type">${a.t.toUpperCase()}</div></div><div class="card-body"><div class="card-name">${a.n}</div><div class="tags"><span class="tag ${a.t}">${a.t.toUpperCase()}</span></div></div>`;
+  }
+  return card;
+}
+
+/* render */
+function filtered(){return A.filter(a=>{const mc=cat==="All"||a.c===cat;const mq=!q||a.n.toLowerCase().includes(q.toLowerCase())||a.c.toLowerCase().includes(q.toLowerCase())||(a.by||"").toLowerCase().includes(q.toLowerCase());return mc&&mq;});}
+function render(){
+  const list=filtered();const grid=document.getElementById("grid");grid.innerHTML="";
+  document.getElementById("cnt").textContent=`${list.length} assets`;
+  if(!list.length){grid.innerHTML='<div class="empty">No assets found</div>';return;}
+  const byCat={};list.forEach(a=>{(byCat[a.c]=byCat[a.c]||[]).push(a);});
+  Object.entries(byCat).forEach(([c,assets])=>{
+    if(cat==="All"){const l=document.createElement("div");l.className="sec";l.textContent=`${ICONS[c]||""} ${c}  ·  ${assets.length}`;grid.appendChild(l);}
+    assets.forEach(a=>grid.appendChild(makeCard(a)));
+  });
+}
+
+buildStats();buildFilters();render();
+document.getElementById("s").addEventListener("input",e=>{q=e.target.value;render();});
+</script>
+</body>
+</html>
