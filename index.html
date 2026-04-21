@@ -79,8 +79,15 @@ main{padding:20px 24px}
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
+let threeLoaded=false;
+function loadThree(cb){
+  if(threeLoaded){cb();return;}
+  const s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+  s.onload=()=>{threeLoaded=true;cb();};
+  document.head.appendChild(s);
+}
 const A=[
   /* BUILDING KIT — live 3D previews (GLB files in /glbs/) */
   {n:"Wood Door",f:"SM_Stylized_Wood_Door.glb",t:"glb",c:"Building",by:""},
@@ -364,8 +371,6 @@ function openModal(asset){
     function step2(){if(!THREE.OrbitControls){loadSc("https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js",doLoad);}else doLoad();}
     if(!THREE.GLTFLoader){loadSc("https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js",step2);}else step2();
   }
-  // Small delay so modal is visible before canvas setup
-  setTimeout(doRender,50);
 }
 
 /* stats */
