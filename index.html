@@ -63,6 +63,22 @@ main{padding:20px 24px}
 </header>
 <div class="stats-bar" id="sb"></div>
 <main><div class="grid" id="grid"></div></main>
+
+<!-- 3D MODAL -->
+<div id="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:1000;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:600px;overflow:hidden;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:0.5px solid rgba(0,0,0,0.09)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span id="modal-title" style="font-size:14px;font-weight:500;color:#1a1a1a"></span>
+        <span id="modal-tag" style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;background:#e1f5ee;color:#0f6e56"></span>
+      </div>
+      <button id="modal-close" style="border:none;background:none;cursor:pointer;font-size:20px;color:#888;padding:0 4px;line-height:1">×</button>
+    </div>
+    <div id="modal-canvas" style="width:100%;aspect-ratio:1;background:#f0eeea;display:flex;align-items:center;justify-content:center"></div>
+    <div style="padding:10px 18px;font-size:11px;color:#999;text-align:center">drag to orbit · scroll to zoom · click outside to close</div>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 const A=[
@@ -256,16 +272,108 @@ const A=[
 ];
 
 const ICONS={Building:"🏗",Landscape:"🌍",Rocks:"🪨",Seating:"🪑",Tables:"🪵",Rugs:"🎨",Lights:"💡",Statues:"🗿",Foliage:"🌿",Pots:"🏺",Creatures:"🦎",Soundsystems:"🎵",Technology:"💻",Transport:"🛹",Instruments:"🎸",Signs:"🪧",Animations:"🎬",Misc:"📦"};
-const GLB_BASE="./";
+const GLB_BASE="https://pub-71d9358ecd8d40928e64419e30afedfd.r2.dev/";
 let cat="All",q="";
+let modalRenderer=null,modalAnimId=null;
+
+/* ── MODAL ─────────────────────────────────────────────────────────────── */
+const modal=document.getElementById("modal");
+const modalCanvas=document.getElementById("modal-canvas");
+const modalTitle=document.getElementById("modal-title");
+const modalTag=document.getElementById("modal-tag");
+const modalClose=document.getElementById("modal-close");
+
+function closeModal(){
+  modal.style.display="none";
+  if(modalAnimId){cancelAnimationFrame(modalAnimId);modalAnimId=null;}
+  if(modalRenderer){modalRenderer.dispose();modalRenderer=null;}
+  modalCanvas.getContext("webgl")&&modalCanvas.getContext("webgl").getExtension("WEBGL_lose_context")&&modalCanvas.getContext("webgl").getExtension("WEBGL_lose_context").loseContext();
+  modalCanvas.innerHTML="";
+}
+modalClose.onclick=closeModal;
+modal.onclick=e=>{if(e.target===modal)closeModal();}
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal();});
+
+function loadSc(src,cb){const s=document.createElement("script");s.src=src;s.onload=cb;s.onerror=cb;document.head.appendChild(s);}
+
+function openModal(asset){
+  closeModal();
+  modal.style.display="flex";
+  modalTitle.textContent=asset.n;
+  modalTag.textContent="GLB · 3D";
+  modalCanvas.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:10px;color:#999;font-size:13px"><div class="sp"></div><span>Loading 3D model…</span></div>';
+
+  function doRender(){
+    modalCanvas.innerHTML="";
+    const canvas=document.createElement("canvas");
+    const W=modalCanvas.clientWidth||500;
+    const H=modalCanvas.clientHeight||500;
+    canvas.width=W;canvas.height=H;
+    canvas.style.width="100%";canvas.style.height="100%";
+    modalCanvas.appendChild(canvas);
+
+    try{modalRenderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});}
+    catch(e){modalCanvas.innerHTML='<div style="color:#999;font-size:13px;padding:20px">WebGL unavailable</div>';return;}
+    modalRenderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+    modalRenderer.setSize(W,H);
+
+    const scene=new THREE.Scene();
+    scene.background=new THREE.Color(0xf0eeea);
+    const cam=new THREE.PerspectiveCamera(45,W/H,0.001,1000);
+    cam.position.set(3,2,4);cam.lookAt(0,0,0);
+    scene.add(new THREE.AmbientLight(0xffffff,0.9));
+    const dl=new THREE.DirectionalLight(0xffffff,0.7);dl.position.set(5,8,5);scene.add(dl);
+    const dl2=new THREE.DirectionalLight(0xffffff,0.3);dl2.position.set(-5,2,-5);scene.add(dl2);
+
+    let controls;
+    function initControls(){
+      if(THREE.OrbitControls){
+        controls=new THREE.OrbitControls(cam,canvas);
+        controls.enableDamping=true;controls.dampingFactor=0.06;
+        controls.autoRotate=true;controls.autoRotateSpeed=1.2;
+        controls.enableZoom=true;controls.minDistance=0.5;controls.maxDistance=20;
+      }
+    }
+
+    function doLoad(){
+      initControls();
+      const loader=new THREE.GLTFLoader();
+      loader.load(GLB_BASE+asset.f,gltf=>{
+        const model=gltf.scene;
+        const box=new THREE.Box3().setFromObject(model);
+        const ctr=box.getCenter(new THREE.Vector3());
+        const sz=box.getSize(new THREE.Vector3());
+        const sc=2.5/Math.max(sz.x,sz.y,sz.z);
+        model.scale.setScalar(sc);model.position.sub(ctr.multiplyScalar(sc));
+        scene.add(model);
+        if(controls)controls.target.set(0,0,0);
+        // Remove spinner
+        const spinner=modalCanvas.querySelector(".sp");
+        if(spinner)spinner.closest("div").remove();
+      },xhr=>{
+        const pct=Math.round(xhr.loaded/xhr.total*100);
+        const sp=modalCanvas.querySelector("span");
+        if(sp&&isFinite(pct))sp.textContent=`Loading… ${pct}%`;
+      },()=>{
+        modalCanvas.innerHTML='<div style="color:#999;font-size:13px;padding:20px;text-align:center">Could not load model</div>';
+      });
+      function anim(){modalAnimId=requestAnimationFrame(anim);if(controls)controls.update();modalRenderer&&modalRenderer.render(scene,cam);}
+      anim();
+    }
+
+    function step2(){if(!THREE.OrbitControls){loadSc("https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js",doLoad);}else doLoad();}
+    if(!THREE.GLTFLoader){loadSc("https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js",step2);}else step2();
+  }
+  // Small delay so modal is visible before canvas setup
+  setTimeout(doRender,50);
+}
 
 /* stats */
 function buildStats(){
   const s=document.getElementById("sb");
   const glbs=A.filter(a=>a.t==="glb").length;
   const cats=new Set(A.map(a=>a.c)).size;
-  
-  [{n:"300+",l:"assets"},{n:glbs,l:"live 3D previews"},{n:cats,l:"categories"}].forEach(({n,l})=>{
+  [{n:"300+",l:"assets"},{n:glbs,l:"3D models"},{n:cats,l:"categories"}].forEach(({n,l})=>{
     const d=document.createElement("div");d.className="stat";
     d.innerHTML=`<span class="stat-n">${n}</span><span class="stat-l">${l}</span>`;
     s.appendChild(d);
@@ -284,57 +392,31 @@ function buildFilters(){
   });
 }
 
-/* load helper */
-function loadSc(src,cb){const s=document.createElement("script");s.src=src;s.onload=cb;s.onerror=cb;document.head.appendChild(s);}
-
-/* GLB loader */
-function loadGLB(thumb,ld,asset){
-  const canvas=document.createElement("canvas");canvas.width=260;canvas.height=260;
-  let renderer;
-  try{renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));renderer.setSize(260,260);}
-  catch(e){ld.innerHTML='<span style="font-size:10px;color:#bbb">WebGL unavailable</span>';return;}
-  const scene=new THREE.Scene();
-  const cam=new THREE.PerspectiveCamera(45,1,0.001,1000);cam.position.set(2,1.5,3);cam.lookAt(0,0,0);
-  scene.add(new THREE.AmbientLight(0xffffff,0.85));
-  const dl=new THREE.DirectionalLight(0xffffff,0.65);dl.position.set(3,5,3);scene.add(dl);
-  const dl2=new THREE.DirectionalLight(0xffffff,0.25);dl2.position.set(-3,2,-3);scene.add(dl2);
-  let controls,model=null;
-  function anim(){requestAnimationFrame(anim);if(controls)controls.update();else if(model)model.rotation.y+=0.008;renderer.render(scene,cam);}
-  function initOC(){
-    if(THREE.OrbitControls){controls=new THREE.OrbitControls(cam,canvas);controls.enableDamping=true;controls.dampingFactor=0.08;controls.autoRotate=true;controls.autoRotateSpeed=1.8;}
-    anim();
-  }
-  function doLoad(){
-    const loader=new THREE.GLTFLoader();
-    loader.load(GLB_BASE+asset.f,gltf=>{
-      model=gltf.scene;
-      const box=new THREE.Box3().setFromObject(model);
-      const ctr=box.getCenter(new THREE.Vector3());
-      const sz=box.getSize(new THREE.Vector3());
-      const sc=2/Math.max(sz.x,sz.y,sz.z);
-      model.scale.setScalar(sc);model.position.sub(ctr.multiplyScalar(sc));
-      scene.add(model);if(controls)controls.target.set(0,0,0);
-      ld.remove();thumb.appendChild(canvas);
-      const hint=thumb.closest(".card").querySelector(".hint");if(hint)hint.style.display="block";
-    },null,()=>{ld.innerHTML='<span style="font-size:10px;color:#bbb;text-align:center;padding:10px">GLB preview<br><small>coming soon</small></span>';});
-  }
-  function step2(){if(!THREE.OrbitControls){loadSc("https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js",()=>{initOC();doLoad();});}else{initOC();doLoad();}}
-  if(!THREE.GLTFLoader){loadSc("https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js",step2);}else step2();
-}
-
-/* cards */
+/* cards — no auto-loading, just a thumbnail with click to open */
 function makeCard(a){
   const card=document.createElement("div");card.className="card";
-  const meta=[a.by,a.c].filter(Boolean).join(" · ");
   if(a.t==="glb"){
-    const thumb=document.createElement("div");thumb.className="preview";
-    const ld=document.createElement("div");ld.className="ld";ld.innerHTML='<div class="sp"></div><span>Loading 3D…</span>';
-    thumb.appendChild(ld);card.appendChild(thumb);
-    card.innerHTML+=`<div class="card-body"><div class="card-name">${a.n}</div><div class="tags"><span class="tag glb">GLB · 3D</span></div></div><div class="hint" style="display:none">drag to orbit · scroll to zoom</div>`;
-    card.insertBefore(thumb,card.firstChild);
-    setTimeout(()=>loadGLB(thumb,ld,a),150);
+    card.style.cursor="pointer";
+    card.innerHTML=`
+      <div class="placeholder" style="position:relative">
+        <div class="cat-icon">${ICONS[a.c]||"📦"}</div>
+        <div style="position:absolute;bottom:10px;right:10px;background:rgba(46,117,182,0.9);color:#fff;font-size:9px;font-weight:600;padding:3px 7px;border-radius:20px;letter-spacing:0.5px">3D</div>
+      </div>
+      <div class="card-body">
+        <div class="card-name">${a.n}</div>
+        <div class="tags"><span class="tag glb">GLB · click to view 3D</span></div>
+      </div>`;
+    card.onclick=()=>openModal(a);
   }else{
-    card.innerHTML=`<div class="placeholder"><div class="cat-icon">${ICONS[a.c]||"📦"}</div><div class="ph-type">${a.t.toUpperCase()}</div></div><div class="card-body"><div class="card-name">${a.n}</div><div class="tags"><span class="tag ${a.t}">${a.t.toUpperCase()}</span></div></div>`;
+    card.innerHTML=`
+      <div class="placeholder">
+        <div class="cat-icon">${ICONS[a.c]||"📦"}</div>
+        <div class="ph-type">${a.t.toUpperCase()}</div>
+      </div>
+      <div class="card-body">
+        <div class="card-name">${a.n}</div>
+        <div class="tags"><span class="tag ${a.t}">${a.t.toUpperCase()}</span></div>
+      </div>`;
   }
   return card;
 }
