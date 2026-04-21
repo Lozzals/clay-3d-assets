@@ -427,7 +427,13 @@ function makeCard(a){
 }
 
 /* render */
-function filtered(){return A.filter(a=>{const mc=cat==='All'||a.c===cat;const mq=!q||a.n.toLowerCase().includes(q.toLowerCase())||a.c.toLowerCase().includes(q.toLowerCase())||(a.by||'').toLowerCase().includes(q.toLowerCase());return mc&&mq;});}
+function filtered(){return A.filter(a=>{
+  const mc=cat==='All'||a.c===cat;
+  const mq=!q||a.n.toLowerCase().includes(q.toLowerCase())||a.c.toLowerCase().includes(q.toLowerCase())||(a.by||'').toLowerCase().includes(q.toLowerCase());
+  // Hide GLB assets not yet in R2
+  const available = a.t!=='glb' || availableGLBs.size===0 || availableGLBs.has(a.f.toLowerCase());
+  return mc&&mq&&available;
+});}
 function render(){
   const list=filtered();const grid=document.getElementById('grid');grid.innerHTML='';
   document.getElementById('cnt').textContent=`${list.length} assets`;
@@ -439,7 +445,25 @@ function render(){
   });
 }
 
-buildStats();buildFilters();render();
+/* Load manifest from R2 and only show assets that exist */
+const MANIFEST_URL = "https://pub-71d9358ecd8d40928e64419e30afedfd.r2.dev/manifest.json";
+let availableGLBs = new Set();
+
+fetch(MANIFEST_URL)
+  .then(r => r.json())
+  .then(files => {
+    files.forEach(f => availableGLBs.add(f.toLowerCase()));
+    buildStats();
+    buildFilters();
+    render();
+  })
+  .catch(() => {
+    // If manifest fails to load, show all assets
+    buildStats();
+    buildFilters();
+    render();
+  });
+
 document.getElementById('s').addEventListener('input',e=>{q=e.target.value;render();});
 </script>
 </body>
